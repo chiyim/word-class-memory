@@ -159,7 +159,7 @@ const SYNC_URL='https://word-sync.chilamc-y.workers.dev';
 const LS_CODE='wclass_synccode_v1';
 let syncCode=localStorage.getItem(LS_CODE)||'';
 let pushTimer=null;
-function saveKnownLocal(){persistKnown();}
+function saveKnownLocal(){localStorage.setItem(LS_KNOWN,JSON.stringify([...known]));}
 function setSyncUI(txt){const b=document.getElementById('syncBtn');if(!b)return;
   b.classList.toggle('on',!!syncCode);
   b.textContent = syncCode ? ('☁️ '+(txt||'已开启')) : '☁️ 云同步';}
