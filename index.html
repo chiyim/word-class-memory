@@ -37,6 +37,9 @@ h1{font-size:17px;margin:0;font-weight:700;letter-spacing:.5px}
 .day-chip{background:var(--chip);border:1px solid var(--line);color:var(--muted);
   padding:4px 9px;border-radius:20px;cursor:pointer;font-size:12px;white-space:nowrap}
 .day-chip.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+header.collapsed .controls,header.collapsed .days{display:none}
+#collapseBtn{transition:transform .2s}
+header.collapsed #collapseBtn{transform:rotate(-90deg)}
 main{max-width:920px;margin:0 auto;padding:14px}
 .daysec{margin-bottom:26px}
 .day-h{font-size:15px;font-weight:700;color:var(--accent2);margin:14px 0 4px;
@@ -89,6 +92,7 @@ main{max-width:920px;margin:0 auto;padding:14px}
     <span class="sub" id="stat"></span>
     <span class="spacer"></span>
     <button class="btn" id="themeBtn">☀️ 浅色</button>
+    <button class="btn" id="collapseBtn" title="收起 / 展开菜单">▾</button>
   </div>
   <div class="controls">
     <input class="search" id="q" placeholder="🔍 搜索英文 / 中文 / 分类…">
@@ -213,6 +217,12 @@ document.getElementById('autoSpkBtn').onclick=function(){autoSpeak=!autoSpeak;th
 // theme
 function applyTheme(t){document.body.classList.toggle('light',t==='light');document.getElementById('themeBtn').textContent=t==='light'?'🌙 深色':'☀️ 浅色';}
 let theme=localStorage.getItem(LS_THEME)||'dark';applyTheme(theme);
+// 顶部菜单收起/展开
+const LS_COLLAPSE='wclass_collapse_v1';
+const headerEl=document.querySelector('header');
+function applyCollapse(c){headerEl.classList.toggle('collapsed',c);}
+applyCollapse(localStorage.getItem(LS_COLLAPSE)==='1');
+document.getElementById('collapseBtn').onclick=()=>{const c=!headerEl.classList.contains('collapsed');applyCollapse(c);localStorage.setItem(LS_COLLAPSE,c?'1':'0');};
 document.getElementById('themeBtn').onclick=()=>{theme=theme==='light'?'dark':'light';localStorage.setItem(LS_THEME,theme);applyTheme(theme);};
 
 // flashcards
