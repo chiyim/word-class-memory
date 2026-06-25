@@ -107,6 +107,7 @@ main{max-width:920px;margin:0 auto;padding:14px}
     <button class="btn" id="enBtn">遮英文</button>
     <button class="btn" id="knownBtn">只看未掌握</button>
     <button class="btn on" id="autoSpkBtn">🔊 自动发音</button>
+    <button class="btn" id="syncBtn">☁️ 云同步</button>
     <button class="btn" id="fcBtn">🃏 翻卡记忆</button>
     <button class="btn" id="resetBtn">重置进度</button>
   </div>
@@ -152,6 +153,33 @@ const DATA =[{"day": "第一天", "group": "个人基本信息", "en": "birth", 
 const LS_KNOWN='wclass_known_v1', LS_THEME='wclass_theme_v1';
 let known = new Set(JSON.parse(localStorage.getItem(LS_KNOWN)||'[]'));
 const id = w => w.day+'|'+w.group+'|'+w.en+'|'+w.zh;
+
+// ---- 云同步 (Cloudflare Worker + KV) ----
+const SYNC_URL='https://word-sync.chilamc-y.workers.dev';
+const LS_CODE='wclass_synccode_v1';
+let syncCode=localStorage.getItem(LS_CODE)||'';
+let pushTimer=null;
+function saveKnownLocal(){persistKnown();}
+function setSyncUI(txt){const b=document.getElementById('syncBtn');if(!b)return;
+  b.classList.toggle('on',!!syncCode);
+  b.textContent = syncCode ? ('☁️ '+(txt||'已开启')) : '☁️ 云同步';}
+function persistKnown(){saveKnownLocal();if(syncCode){clearTimeout(pushTimer);pushTimer=setTimeout(cloudPush,1200);}}
+async function cloudPush(){if(!syncCode)return;setSyncUI('同步中…');
+  try{const r=await fetch(SYNC_URL+'/?code='+encodeURIComponent(syncCode),{method:'PUT',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify({known:[...known]})});
+    if(!r.ok)throw 0;setSyncUI('已同步 ✓');}catch(e){setSyncUI('同步失败');}}
+async function cloudPull(){if(!syncCode)return false;setSyncUI('同步中…');
+  try{const r=await fetch(SYNC_URL+'/?code='+encodeURIComponent(syncCode));const d=await r.json();
+    (d.known||[]).forEach(x=>known.add(x));saveKnownLocal();render();setSyncUI('已同步 ✓');return true;}
+  catch(e){setSyncUI('同步失败');return false;}}
+async function enableSync(){
+  const code=(prompt('输入同步码（在所有设备用同一个码即可互通进度，至少4位）：',syncCode||'')||'').trim();
+  if(code===''){return;}
+  if(code.length<4){alert('同步码至少4位');return;}
+  syncCode=code;localStorage.setItem(LS_CODE,code);setSyncUI('同步中…');
+  await cloudPull();      // 拉取云端并与本地合并
+  await cloudPush();      // 把合并结果推回云端
+}
 let curDay='all', onlyUnknown=false;
 
 // build day list
@@ -209,7 +237,7 @@ main.addEventListener('click',e=>{
   const i=decodeURIComponent(el.dataset.id);
   if(known.has(i))known.delete(i);else known.add(i);
   el.classList.toggle('known');
-  localStorage.setItem(LS_KNOWN,JSON.stringify([...known]));
+  persistKnown();
   document.getElementById('stat').textContent=`共 ${DATA.length} 词 · 已掌握 ${known.size} · 当前 ${filtered().length}`;
 });
 q.addEventListener('input',render);
@@ -218,7 +246,10 @@ function tgl(btnId,cls,after){const b=document.getElementById(btnId);b.onclick=(
 tgl('zhBtn','hide-zh',()=>document.querySelectorAll('.reveal').forEach(s=>s.classList.remove('reveal')));
 tgl('enBtn','hide-en',()=>document.querySelectorAll('.reveal').forEach(s=>s.classList.remove('reveal')));
 document.getElementById('knownBtn').onclick=function(){onlyUnknown=!onlyUnknown;this.classList.toggle('on',onlyUnknown);render();};
-document.getElementById('resetBtn').onclick=()=>{if(confirm('确定清空“已掌握”进度？')){known.clear();localStorage.removeItem(LS_KNOWN);render();}};
+document.getElementById('resetBtn').onclick=()=>{if(confirm('确定清空“已掌握”进度？（仅清空本设备）')){known.clear();localStorage.removeItem(LS_KNOWN);render();if(syncCode)cloudPush();}};
+document.getElementById('syncBtn').onclick=enableSync;
+setSyncUI();
+if(syncCode){cloudPull();}  // 打开页面时自动从云端拉取并合并
 document.getElementById('autoSpkBtn').onclick=function(){autoSpeak=!autoSpeak;this.classList.toggle('on',autoSpeak);if(!autoSpeak)speechSynthesis.cancel();};
 
 // theme
@@ -256,7 +287,7 @@ document.getElementById('fcNext').onclick=()=>{fi=(fi+1)%deck.length;drawCard();
 document.getElementById('fcPrev').onclick=()=>{fi=(fi-1+deck.length)%deck.length;drawCard();};
 document.getElementById('fcSpeak').onclick=()=>speak(deck[fi].en);
 document.getElementById('fcShuffle').onclick=()=>{for(let i=deck.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[deck[i],deck[j]]=[deck[j],deck[i]];}fi=0;drawCard();};
-document.getElementById('fcKnown').onclick=()=>{known.add(id(deck[fi]));localStorage.setItem(LS_KNOWN,JSON.stringify([...known]));if(fi<deck.length-1){fi++;drawCard();}else drawCard();};
+document.getElementById('fcKnown').onclick=()=>{known.add(id(deck[fi]));persistKnown();if(fi<deck.length-1){fi++;drawCard();}else drawCard();};
 document.getElementById('fcMode').onclick=function(){fcMode=fcMode==='en2zh'?'zh2en':'en2zh';this.textContent=fcMode==='en2zh'?'英→中':'中→英';drawCard();};
 document.addEventListener('keydown',e=>{if(!fc.classList.contains('show'))return;
   if(e.key==='ArrowRight')document.getElementById('fcNext').click();
