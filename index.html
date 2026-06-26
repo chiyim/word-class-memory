@@ -85,6 +85,22 @@ main{max-width:920px;margin:0 auto;padding:14px}
 .fc-close{position:absolute;top:18px;right:20px;font-size:26px;color:var(--muted);
   cursor:pointer;background:none;border:none}
 .fc-title{position:absolute;top:20px;left:20px;color:var(--muted);font-size:13px}
+.w .trl{flex:none;font-size:12px;color:var(--muted);cursor:pointer;padding:8px 4px;margin:-8px 0;user-select:none;opacity:.5;transition:.12s}
+.w .trl:hover{opacity:1;color:var(--accent2)}
+.trans-bg{position:fixed;inset:0;background:rgba(8,10,14,.6);z-index:40;display:none}
+.trans-bg.show{display:block}
+.trans-popup{position:fixed;z-index:45;background:var(--panel);border:1px solid var(--line);
+  border-radius:14px;padding:20px 22px 18px;max-width:340px;width:92vw;
+  left:50%;top:50%;transform:translate(-50%,-50%);
+  box-shadow:0 8px 40px rgba(0,0,0,.5);display:none}
+.trans-popup.show{display:block}
+.trans-close{position:absolute;top:12px;right:16px;background:none;border:none;
+  color:var(--muted);font-size:22px;cursor:pointer;line-height:1}
+.trans-en{font-size:20px;font-weight:700;color:var(--en);margin-bottom:8px;padding-right:20px}
+.trans-main{font-size:16px;color:var(--txt);margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--line)}
+.trans-pos{font-size:12px;color:var(--pos);margin:8px 0 3px;font-weight:600}
+.trans-terms{font-size:13px;color:var(--muted);line-height:1.6}
+.trans-loading{color:var(--muted);font-size:13px;padding:8px 0}
 @media(max-width:560px){
   .grid{grid-template-columns:1fr}
   .w{padding:11px 13px}
@@ -134,6 +150,12 @@ main{max-width:920px;margin:0 auto;padding:14px}
     <button class="btn" id="fcKnown">✓ 标记掌握</button>
     <button class="btn" id="fcMode">英→中</button>
   </div>
+</div>
+
+<div class="trans-bg" id="transBg"></div>
+<div class="trans-popup" id="transPopup">
+  <button class="trans-close" id="transClose">×</button>
+  <div id="transBody"></div>
 </div>
 
 <script>
@@ -244,7 +266,7 @@ function render(){
       arr.forEach(w=>{
         const k=known.has(id(w))?' known':'';
         html+=`<div class="w${k}" data-id="${encodeURIComponent(id(w))}">
-          <span class="w-word"><span class="en">${w.en}</span><span class="ipa" data-word="${w.en.replace(/"/g,'&quot;')}">${ipaCache[w.en]||''}</span></span><span class="pos">${w.pos||''}</span><span class="zh">${w.zh}</span><span class="spk" data-en="${w.en.replace(/"/g,'&quot;')}">🔊</span></div>`;
+          <span class="w-word"><span class="en">${w.en}</span><span class="ipa" data-word="${w.en.replace(/"/g,'&quot;')}">${ipaCache[w.en]||''}</span></span><span class="pos">${w.pos||''}</span><span class="zh">${w.zh}</span><span class="trl" data-en="${w.en.replace(/"/g,'&quot;')}">详</span><span class="spk" data-en="${w.en.replace(/"/g,'&quot;')}">🔊</span></div>`;
       });
       html+=`</div></div>`;
     }
@@ -253,9 +275,49 @@ function render(){
   main.innerHTML=html;
   fetchVisibleIpa();
 }
+// ---- 翻译弹窗 ----
+const LS_TRANS='wclass_trans_v1';
+const transCache=(()=>{try{return JSON.parse(localStorage.getItem(LS_TRANS)||'{}')}catch{return {};}})();
+function saveTransCache(){try{localStorage.setItem(LS_TRANS,JSON.stringify(transCache));}catch{}}
+function renderTransBody(word,data){
+  let h=`<div class="trans-en">${word}</div>`;
+  if(!data){return h+'<div class="trans-loading">查询失败，请重试</div>';}
+  const main=data.sentences?.[0]?.trans||'';
+  if(main)h+=`<div class="trans-main">${main}</div>`;
+  (data.dict||[]).forEach(d=>{
+    h+=`<div class="trans-pos">${d.pos}</div><div class="trans-terms">${(d.terms||[]).slice(0,6).join('、')}</div>`;
+  });
+  return h;
+}
+function closeTrans(){
+  document.getElementById('transPopup').classList.remove('show');
+  document.getElementById('transBg').classList.remove('show');
+}
+async function showTrans(word){
+  const popup=document.getElementById('transPopup');
+  const body=document.getElementById('transBody');
+  popup.classList.add('show');
+  document.getElementById('transBg').classList.add('show');
+  if(transCache[word]!==undefined){body.innerHTML=renderTransBody(word,transCache[word]);return;}
+  body.innerHTML=`<div class="trans-en">${word}</div><div class="trans-loading">查询中…</div>`;
+  try{
+    const r=await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=zh-CN&dt=t&dt=bd&dj=1&q=${encodeURIComponent(word)}`);
+    if(r.ok){
+      const d=await r.json();
+      transCache[word]={sentences:d.sentences,dict:d.dict};
+      saveTransCache();
+      body.innerHTML=renderTransBody(word,transCache[word]);
+    }else{body.innerHTML=renderTransBody(word,null);}
+  }catch{body.innerHTML=renderTransBody(word,null);}
+}
+document.getElementById('transClose').onclick=closeTrans;
+document.getElementById('transBg').onclick=closeTrans;
+
 main.addEventListener('click',e=>{
   const sp=e.target.closest('.spk');
   if(sp){speak(sp.dataset.en,sp);return;}
+  const trl=e.target.closest('.trl');
+  if(trl){showTrans(trl.dataset.en);return;}
   const zh=e.target.closest('.zh');
   if(zh){
     const card=zh.closest('.w');
