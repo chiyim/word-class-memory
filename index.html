@@ -266,7 +266,7 @@ function render(){
       arr.forEach(w=>{
         const k=known.has(id(w))?' known':'';
         html+=`<div class="w${k}" data-id="${encodeURIComponent(id(w))}">
-          <span class="w-word"><span class="en">${w.en}</span><span class="ipa" data-word="${w.en.replace(/"/g,'&quot;')}">${ipaCache[w.en]||''}</span></span><span class="pos">${w.pos||''}</span><span class="zh">${w.zh}</span><span class="trl" data-en="${w.en.replace(/"/g,'&quot;')}">详</span><span class="spk" data-en="${w.en.replace(/"/g,'&quot;')}">🔊</span></div>`;
+          <span class="w-word"><span class="en">${w.en}</span><span class="ipa" data-word="${w.en.replace(/"/g,'&quot;')}">${ipaCache[w.en]||''}</span></span><span class="pos">${w.pos||''}</span><span class="trl" data-en="${w.en.replace(/"/g,'&quot;')}">详</span><span class="zh">${w.zh}</span><span class="spk" data-en="${w.en.replace(/"/g,'&quot;')}">🔊</span></div>`;
       });
       html+=`</div></div>`;
     }
