@@ -37,9 +37,9 @@ h1{font-size:17px;margin:0;font-weight:700;letter-spacing:.5px}
 .day-chip{background:var(--chip);border:1px solid var(--line);color:var(--muted);
   padding:4px 9px;border-radius:20px;cursor:pointer;font-size:12px;white-space:nowrap}
 .day-chip.active{background:var(--accent);color:#fff;border-color:var(--accent)}
-header.collapsed .controls,header.collapsed .days,header.collapsed .statline{display:none}
+header.collapsed .controls,header.collapsed .days{display:none}
 .statline{font-size:13px;color:var(--muted);padding:4px 0 0 2px}
-#collapseBtn{transition:transform .2s}
+#collapseBtn{transition:transform .2s;font-size:26px;line-height:1;padding:2px 8px}
 header.collapsed #collapseBtn{transform:rotate(-90deg)}
 main{max-width:920px;margin:0 auto;padding:14px}
 .daysec{margin-bottom:26px}
@@ -181,12 +181,13 @@ async function enableSync(){
   await cloudPull();      // 拉取云端并与本地合并
   await cloudPush();      // 把合并结果推回云端
 }
-let curDay='all', onlyUnknown=false;
+const LS_DAY='wclass_day_v1';
+let curDay=localStorage.getItem(LS_DAY)||'all', onlyUnknown=false;
 
 // build day list
 const days=[]; DATA.forEach(w=>{if(!days.includes(w.day))days.push(w.day)});
 const daysEl=document.getElementById('days');
-function dayChip(label,val){const b=document.createElement('div');b.className='day-chip'+(val==curDay?' active':'');b.textContent=label;b.onclick=()=>{curDay=val;render();[...daysEl.children].forEach(c=>c.classList.remove('active'));b.classList.add('active');window.scrollTo(0,0);};return b;}
+function dayChip(label,val){const b=document.createElement('div');b.className='day-chip'+(val==curDay?' active':'');b.textContent=label;b.onclick=()=>{curDay=val;localStorage.setItem(LS_DAY,val);render();[...daysEl.children].forEach(c=>c.classList.remove('active'));b.classList.add('active');window.scrollTo(0,0);};return b;}
 daysEl.appendChild(dayChip('全部',  'all'));
 days.forEach(d=>daysEl.appendChild(dayChip(d,d)));
 
@@ -260,7 +261,7 @@ let theme=localStorage.getItem(LS_THEME)||'dark';applyTheme(theme);
 const LS_COLLAPSE='wclass_collapse_v1';
 const headerEl=document.querySelector('header');
 function applyCollapse(c){headerEl.classList.toggle('collapsed',c);}
-applyCollapse(localStorage.getItem(LS_COLLAPSE)==='1');
+applyCollapse(localStorage.getItem(LS_COLLAPSE)!=='0');
 document.getElementById('collapseBtn').onclick=()=>{const c=!headerEl.classList.contains('collapsed');applyCollapse(c);localStorage.setItem(LS_COLLAPSE,c?'1':'0');};
 document.getElementById('themeBtn').onclick=()=>{theme=theme==='light'?'dark':'light';localStorage.setItem(LS_THEME,theme);applyTheme(theme);};
 
