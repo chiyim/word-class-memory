@@ -56,8 +56,8 @@ main{max-width:920px;margin:0 auto;padding:14px}
 .w:hover{border-color:var(--accent)}
 .w .en{color:var(--en);font-weight:600;font-size:19px}
 .w .pos{color:var(--pos);font-size:13px;font-style:italic}
-.w .zh{color:var(--zh);font-size:17px;margin-left:auto;text-align:right}
-.w .spk{flex:none;font-size:13px;opacity:.5;cursor:pointer;user-select:none;padding:0 2px;transition:.12s}
+.w .zh{color:var(--zh);font-size:17px;margin-left:auto;text-align:right;cursor:pointer}
+.w .spk{flex:none;font-size:13px;opacity:.5;cursor:pointer;user-select:none;padding:8px 10px;margin:-8px -10px -8px 0;transition:.12s}
 .w .spk:hover{opacity:1;transform:scale(1.2)}
 .w .spk.playing{opacity:1;color:var(--accent)}
 .w.known{opacity:.4}
@@ -231,6 +231,16 @@ function render(){
 main.addEventListener('click',e=>{
   const sp=e.target.closest('.spk');
   if(sp){speak(sp.dataset.en,sp);return;}
+  const zh=e.target.closest('.zh');
+  if(zh){
+    const card=zh.closest('.w');
+    if(document.body.classList.contains('hide-zh')||document.body.classList.contains('hide-en')){
+      const hidden=card.querySelector('.zh:not(.reveal),.en:not(.reveal)');
+      if(hidden){card.querySelectorAll('.zh,.en,.pos').forEach(s=>s.classList.add('reveal'));return;}
+    }
+    const spk=card.querySelector('.spk');
+    if(spk){speak(spk.dataset.en,spk);return;}
+  }
   const el=e.target.closest('.w'); if(!el)return;
   // if in mask mode, first click reveals just this card
   if(document.body.classList.contains('hide-zh')||document.body.classList.contains('hide-en')){
