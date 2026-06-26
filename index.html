@@ -85,12 +85,13 @@ main{max-width:920px;margin:0 auto;padding:14px}
 .fc-close{position:absolute;top:18px;right:20px;font-size:26px;color:var(--muted);
   cursor:pointer;background:none;border:none}
 .fc-title{position:absolute;top:20px;left:20px;color:var(--muted);font-size:13px}
-.w .trl{flex:none;font-size:12px;color:var(--muted);cursor:pointer;padding:8px 4px;margin:-8px 0;user-select:none;opacity:.5;transition:.12s}
+.w .trl{flex:none;font-size:14px;color:var(--muted);cursor:pointer;padding:8px 4px;margin:-8px 0;user-select:none;opacity:.5;transition:.12s}
 .w .trl:hover{opacity:1;color:var(--accent2)}
 .trans-bg{position:fixed;inset:0;background:rgba(8,10,14,.6);z-index:40;display:none}
 .trans-bg.show{display:block}
 .trans-popup{position:fixed;z-index:45;background:var(--panel);border:1px solid var(--line);
-  border-radius:14px;padding:20px 22px 18px;max-width:340px;width:92vw;
+  border-radius:14px;padding:20px 22px 18px;max-width:380px;width:92vw;
+  max-height:82vh;overflow-y:auto;
   left:50%;top:50%;transform:translate(-50%,-50%);
   box-shadow:0 8px 40px rgba(0,0,0,.5);display:none}
 .trans-popup.show{display:block}
@@ -101,6 +102,10 @@ main{max-width:920px;margin:0 auto;padding:14px}
 .trans-pos{font-size:12px;color:var(--pos);margin:8px 0 3px;font-weight:600}
 .trans-terms{font-size:13px;color:var(--muted);line-height:1.6}
 .trans-loading{color:var(--muted);font-size:13px;padding:8px 0}
+.trans-divider{height:1px;background:var(--line);margin:12px 0}
+.trans-def{font-size:13px;color:var(--txt);margin:4px 0 2px;line-height:1.5}
+.trans-ex{font-size:12px;color:var(--muted);font-style:italic;margin:2px 0 6px;line-height:1.4}
+.trans-syn{font-size:12px;color:var(--muted);margin:3px 0}
 @media(max-width:560px){
   .grid{grid-template-columns:1fr}
   .w{padding:11px 13px}
@@ -276,17 +281,31 @@ function render(){
   fetchVisibleIpa();
 }
 // ---- 翻译弹窗 ----
-const LS_TRANS='wclass_trans_v1';
+const LS_TRANS='wclass_trans_v2';
 const transCache=(()=>{try{return JSON.parse(localStorage.getItem(LS_TRANS)||'{}')}catch{return {};}})();
 function saveTransCache(){try{localStorage.setItem(LS_TRANS,JSON.stringify(transCache));}catch{}}
 function renderTransBody(word,data){
   let h=`<div class="trans-en">${word}</div>`;
-  if(!data){return h+'<div class="trans-loading">查询失败，请重试</div>';}
+  if(!data||(!data.sentences&&!data.defs)){return h+'<div class="trans-loading">查询失败，请重试</div>';}
+  // 中文译义
   const main=data.sentences?.[0]?.trans||'';
   if(main)h+=`<div class="trans-main">${main}</div>`;
   (data.dict||[]).forEach(d=>{
-    h+=`<div class="trans-pos">${d.pos}</div><div class="trans-terms">${(d.terms||[]).slice(0,6).join('、')}</div>`;
+    h+=`<div class="trans-pos">${d.pos}</div><div class="trans-terms">${(d.terms||[]).slice(0,10).join('、')}</div>`;
   });
+  // 英文释义
+  if(data.defs?.length){
+    h+=`<div class="trans-divider"></div>`;
+    data.defs.forEach(m=>{
+      h+=`<div class="trans-pos">${m.partOfSpeech}</div>`;
+      (m.definitions||[]).forEach(def=>{
+        h+=`<div class="trans-def">${def.definition}</div>`;
+        if(def.example)h+=`<div class="trans-ex">"${def.example}"</div>`;
+      });
+      if(m.synonyms?.length)h+=`<div class="trans-syn">近义词：${m.synonyms.join(', ')}</div>`;
+      if(m.antonyms?.length)h+=`<div class="trans-syn">反义词：${m.antonyms.join(', ')}</div>`;
+    });
+  }
   return h;
 }
 function closeTrans(){
@@ -300,15 +319,25 @@ async function showTrans(word){
   document.getElementById('transBg').classList.add('show');
   if(transCache[word]!==undefined){body.innerHTML=renderTransBody(word,transCache[word]);return;}
   body.innerHTML=`<div class="trans-en">${word}</div><div class="trans-loading">查询中…</div>`;
-  try{
-    const r=await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=zh-CN&dt=t&dt=bd&dj=1&q=${encodeURIComponent(word)}`);
-    if(r.ok){
-      const d=await r.json();
-      transCache[word]={sentences:d.sentences,dict:d.dict};
-      saveTransCache();
-      body.innerHTML=renderTransBody(word,transCache[word]);
-    }else{body.innerHTML=renderTransBody(word,null);}
-  }catch{body.innerHTML=renderTransBody(word,null);}
+  const [gRes,dictRes]=await Promise.allSettled([
+    fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=zh-CN&dt=t&dt=bd&dj=1&q=${encodeURIComponent(word)}`),
+    fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`)
+  ]);
+  let sentences=null,dict=null,defs=null;
+  if(gRes.status==='fulfilled'&&gRes.value.ok){const d=await gRes.value.json();sentences=d.sentences;dict=d.dict;}
+  if(dictRes.status==='fulfilled'&&dictRes.value.ok){
+    const d=await dictRes.value.json();
+    defs=(d[0]?.meanings||[]).map(m=>({
+      partOfSpeech:m.partOfSpeech,
+      definitions:(m.definitions||[]).slice(0,2).map(def=>({definition:def.definition,example:def.example||''})),
+      synonyms:[...new Set([...(m.synonyms||[]),...(m.definitions||[]).flatMap(d=>d.synonyms||[])])].slice(0,6),
+      antonyms:[...new Set([...(m.antonyms||[]),...(m.definitions||[]).flatMap(d=>d.antonyms||[])])].slice(0,4)
+    }));
+  }
+  const data={sentences,dict,defs};
+  transCache[word]=data;
+  saveTransCache();
+  body.innerHTML=renderTransBody(word,data);
 }
 document.getElementById('transClose').onclick=closeTrans;
 document.getElementById('transBg').onclick=closeTrans;
